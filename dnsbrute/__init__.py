@@ -24,10 +24,11 @@ NsResult = namedtuple('NsResult', ['host'])
 SoaResult = namedtuple('SoaResult', ['nsname', 'hostmaster', 'serial',
                                      'refresh', 'retry', 'expires', 'minttl'])
 SrvResult = namedtuple('SrvResult', ['host', 'port', 'priority', 'weight'])
-TxtResult = namedtuple('TextResult', ['host'])
+TxtResult = namedtuple('TxtResult', ['host'])
+
 
 def rand_name():
-    return base64.b32encode(os.urandom(50))[:random.randint(5,30)].lower()
+    return base64.b32encode(os.urandom(50))[:random.randint(5, 30)].lower()
 
 
 class DNSNameTester(object):
@@ -50,9 +51,9 @@ class DNSNameTester(object):
         for query_type in lookups:
             try:
                 resp = self.bruter.query(dnsname, query_type).get()
-                self.bruter.result(self.domain, dnsname, query_type, resp, None)
+                self.bruter.on_result(self.domain, dnsname, query_type, resp, None)
             except DNSError as ex:
-                self.bruter.result(self.domain, dnsname, query_type, None, ex)
+                self.bruter.on_result(self.domain, dnsname, query_type, None, ex)
 
 
 class DNSTesterGenerator(object):
@@ -78,16 +79,9 @@ class DNSBrute(object):
             self.domains += filter(None, options.domains.read().split("\n"))
         self.domains += options.domain
         self.domains = list(set(self.domains))
-        resolvers = map(str.strip, filter(None, options.resolvers.read().split("\n")))
-        random.shuffle(resolvers)
+        self.resolvers = map(str.strip, filter(None, options.resolvers.read().split("\n")))
+        random.shuffle(self.resolvers)
         self.names = filter(None, options.names.read().split("\n"))
-        self.pycares_opts = dict(
-            tries=options.retries,
-            timeout=options.timeout,
-            domains=[],
-            lookup='b',
-            servers=resolvers,
-        )
         if options.progress:
             self.progress = progressbar.ProgressBar(
                 redirect_stdout=True,
@@ -99,17 +93,27 @@ class DNSBrute(object):
             self.progress = None
         self.finished = 0
         LOG.info("%d names, %d resolvers, %d domains",
-            len(self.names), len(resolvers), len(self.domains))
+                 len(self.names), len(self.resolvers), len(self.domains))
 
     def valid(self):
-        return len(self.domains) > 0
+        return len(self.domains) and len(self.resolvers) and len(self.names)
 
     def _print_result(self, dnsname, query_type, result):
         res_keys = ' '.join(['='.join([field, str(getattr(result, field))])
                              for field in result._fields])
-        print(' '.join([dnsname, query_type, res_keys]))
+        info = ' '.join([dnsname, query_type, res_keys])
+        if not self.options.quiet:
+            print(info)
+        output = self.options.output
+        if output:
+            output.write(info + "\n")
+            output.flush()
 
-    def result(self, domain, dnsname, query_type, resp, error):
+
+    def on_result(self, domain, dnsname, query_type, resp, error=None):
+        """
+        When a DNS name tester finds a result, it triggers this
+        """
         if resp:
             results = self._format_results(query_type, resp)
             for _, result in results:
@@ -120,26 +124,33 @@ class DNSBrute(object):
         self.finished += 1
 
     def query(self, name, query_type):
-        return DNSResolver.query(name, query_type, pycares_opts=self.pycares_opts)
+        return DNSResolver.query(name, query_type, timeout=self.options.timeout,
+                                 tries=self.options.retries, servers=self.resolvers)
 
     def _format_result(self, query_type, resp):
+        """
+        Translates between Pycares result, and dnsbrute result
+        Ignores the 'ttl' field, because that varies and we don't care about it
+        """
         if isinstance(resp, pycares.ares_query_simple_result):
-            return (query_type, SimpleResult(resp.host))
+            resp = (query_type, SimpleResult(resp.host))
         elif isinstance(resp, pycares.ares_query_cname_result):
-            return (query_type, CnameResult(resp.cname))
+            resp = (query_type, CnameResult(resp.cname))
         elif isinstance(resp, pycares.ares_query_mx_result):
-            return (query_type, MxResult(resp.host, resp.priority))
+            resp = (query_type, MxResult(resp.host, resp.priority))
         elif isinstance(resp, pycares.ares_query_ns_result):
-            return (query_type, NsResult(resp.host))
+            resp = (query_type, NsResult(resp.host))
         elif isinstance(resp, pycares.ares_query_soa_result):
-            return (query_type, SoaResult(resp.nsname, resp.hostmaster, resp.serial,
+            resp = (query_type, SoaResult(resp.nsname, resp.hostmaster, resp.serial,
                                           resp.refresh, resp.retry, resp.expires, resp.minttl))
         elif isinstance(resp, pycares.ares_query_srv_result):
-            return (query_type, SrvResult(resp.host, resp.port, resp.priority,
+            resp = (query_type, SrvResult(resp.host, resp.port, resp.priority,
                                           resp.weight))
         elif isinstance(resp, pycares.ares_query_txt_result):
-            return (query_type, TxtResult(resp.text))
-        return (query_type, resp)
+            resp = (query_type, TxtResult(resp.text))
+        else:
+            resp = (query_type, resp)
+        return resp
 
     def _format_results(self, query_type, resp_list):
         if not isinstance(resp_list, list):
@@ -150,22 +161,25 @@ class DNSBrute(object):
         ]
 
     def _find_wildcards(self):
-        LOG.info("Checking for wildcard responses to eliminate from results")
+        """
+        Queries some random non-existant records to reduce false positives.
+        """
+        LOG.info("Eliminating wildcard responses from results")
         results = []
         for domain in self.domains:
             names = [rand_name(), rand_name(), rand_name()]
             for name in names:
-                for query_type in ['A', 'AAAA', 'CNAME']:
+                for query_type in ['A', 'AAAA']:
                     dnsname = name + '.' + domain
                     try:
                         resp = self.query(dnsname, query_type).get()
-                    except DNSError as ex:
+                    except DNSError:
                         continue
                     for result in self._format_results(query_type, resp):
+                        LOG.debug('Found wildcard response: %r', result)
                         results.append((domain, result))
-        results = set(results)
         wildcards = []
-        for domain, (query_type, resp) in results:
+        for domain, (query_type, resp) in set(results):
             wildcards.append((domain, resp))
             self._print_result('*.' + domain, query_type, resp)
         self.wildcards = wildcards
@@ -184,7 +198,7 @@ class DNSBrute(object):
                 pool.add(gevent.spawn(tester.run))
         except KeyboardInterrupt:
             print("Ctrl+C caught... stopping")
-            pool.join()
+        pool.join()
 
 
 class DNSError(Exception):
@@ -222,7 +236,7 @@ class DNSResolver(object):
     _thread = None
 
     @classmethod
-    def query(cls, name, query_type, pycares_opts=None):
+    def query(cls, name, query_type, timeout=1.5, tries=2, servers=None):
         """Begin a DNS lookup. The result (or exception) will be in the
         returned :class:`~gevent.event.AsyncResult` when it is available.
 
@@ -234,20 +248,18 @@ class DNSResolver(object):
         :rtype: :class:`~gevent.event.AsyncResult`
 
         """
-        if not pycares_opts:
-            pycares_opts = dict()
+        if not servers:
+            servers = ['8.8.4.4', '8.8.8.8']
         result = AsyncResult()
         query_type = cls._get_query_type(query_type)
-        if pycares_opts is None:
-            pycares_opts = dict()
         cls._channel = cls._channel or cls.channel or pycares.Channel(
             pycares.ARES_FLAG_NOSEARCH,  # flags
-            pycares_opts['timeout'],
-            pycares_opts['tries'],
+            timeout,
+            tries,
             1,  # ndots
             53,  # tcp_port
             53,  # udp_port
-            pycares_opts['servers'],
+            servers,
             [],  # domains
             'b')  # lookup
         cls._channel.query(name, query_type, partial(cls._result_cb, result))
@@ -281,14 +293,14 @@ class DNSResolver(object):
                     cls._channel.process_fd(pycares.ARES_SOCKET_BAD,
                                             pycares.ARES_SOCKET_BAD)
                     continue
-                rlist, wlist, xlist = select.select(
+                rlist, wlist, _ = select.select(
                     read_fds, write_fds, [], timeout)
                 for fd in rlist:
                     cls._channel.process_fd(fd, pycares.ARES_SOCKET_BAD)
                 for fd in wlist:
                     cls._channel.process_fd(pycares.ARES_SOCKET_BAD, fd)
         except Exception:
-            logging.log_exception(__name__)
+            LOG.exception(__name__)
             cls._channel.cancel()
             cls._channel = None
             raise
