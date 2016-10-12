@@ -1,0 +1,3 @@
+gevent
+pycares
+git+https://github.com/WoLpH/python-progressbar.git@develop
