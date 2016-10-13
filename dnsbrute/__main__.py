@@ -21,6 +21,9 @@ def main():
     parser.add_argument('-o', '--output', metavar='OUTFILE',
                         type=argparse.FileType('w+'),
                         help="Output results to file")
+    parser.add_argument('-j', '--json', metavar='OUTJSON',
+                        type=argparse.FileType('w+'),
+                        help="Output results, as JSON to file")
     parser.add_argument('-r', '--resolvers', metavar='RESOLVERS_FILE',
                         default=pkg_resources.resource_stream(__name__, "resolvers.txt"),
                         type=argparse.FileType('r'),
