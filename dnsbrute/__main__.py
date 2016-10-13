@@ -35,6 +35,8 @@ def main():
     parser.add_argument('-d', '--domains', metavar='DOMAINS_FILE',
                         type=argparse.FileType('r'),
                         help="Load target domains from file")
+    parser.add_argument('-W', '--wildcard-tests', default=3, type=int, metavar='N',
+                        help="Wildcard elimination test queries, default: 3")
     parser.add_argument('-R', '--retries', default=2, type=int, metavar='N',
                         help="Retries on failed DNS request, default: 2")
     parser.add_argument('-C', '--concurrency', default=20, type=int,

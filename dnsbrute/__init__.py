@@ -63,7 +63,7 @@ class DNSTesterGenerator(object):
 
 class DNSBrute(object):
     def __init__(self, options):
-        self.wildcards = set([])
+        self.wildcards = []
         self.options = options
         self.domains = []
         if options.domains:
@@ -89,16 +89,25 @@ class DNSBrute(object):
     def valid(self):
         return len(self.domains) and len(self.resolvers) and len(self.names)
 
-    def _print_result(self, dnsname, query_type, result):
+    def _output_result(self, dnsname, query_type, result):
+        """
+        Output results, in various formats, to necessary places
+        """
         res_keys = ' '.join(['='.join([key, str(value)])
                              for key, value in result.items()])
         info = ' '.join([dnsname, query_type, res_keys])
+        #
+        # To console
         if not self.options.quiet:
             print(info)
+        #
+        # Shit out same as console, but to file
         output = self.options.output
         if output:
             output.write(info + "\n")
             output.flush()
+        #
+        # Optionally shit out JSON
         outjson = self.options.json
         if outjson:
             outdict = result.copy()
@@ -108,27 +117,13 @@ class DNSBrute(object):
                 outdict['_wildcard'] = True
             outjson.write(json.dumps(outdict) + "\n")
 
-
-    def on_result(self, domain, dnsname, query_type, resp, error=None):
-        """
-        When a DNS name tester finds a result, it triggers this
-        """
-        if resp:
-            results = self._format_results(query_type, resp)
-            for _, result in results:
-                if query_type not in ['A', 'AAAA'] or (domain, query_type, result['host']) not in self.wildcards:
-                    self._print_result(dnsname, query_type, result)
-        if self.progress:
-            self.progress.update(self.finished)
-        self.finished += 1
-
-    def query(self, name, query_type):
-        return DNSResolver.query(name, query_type, timeout=self.options.timeout,
-                                 tries=self.options.retries, servers=self.resolvers)
-
     def _structseq_to_dict(self, obj):
         """
-        Converts a structseq result from pycares module, into a dict
+        Converts a structseq result from pycares module, into a dict.
+
+        Horribly hacky way, because I couldn't find how to get a list of 
+        structseq names, __reduce__ will only return unnamed fields as dict,
+        all the named fields are as a tuple!
         """
         ignored_fields = ['n_fields', 'n_sequence_fields', 'n_unnamed_fields', 'ttl']
         fields = dict([(field, getattr(obj, field))
@@ -151,14 +146,48 @@ class DNSBrute(object):
             for resp in resp_list
         ]
 
+    def on_result(self, domain, dnsname, query_type, resp, error=None):
+        """
+        When a DNS name tester finds a result, it triggers this
+        """
+        if resp:
+            results = self._format_results(query_type, resp)
+            for _, result in results:
+                if not self._is_wildcard(domain, query_type, result):
+                    self._output_result(dnsname, query_type, result)
+        if self.progress:
+            self.progress.update(self.finished)
+        self.finished += 1
+
+    def query(self, name, query_type):
+        return DNSResolver.query(name, query_type, timeout=self.options.timeout,
+                                 tries=self.options.retries, servers=self.resolvers)
+
+    def _is_wildcard(self, domain, query_type, result):
+        if query_type in ['A', 'AAAA']:
+            return (domain, query_type, result['host']) in self.wildcards
+
+    def _add_wildcard(self, domain, query_type, result):
+        """
+        Remember the result as a wildcard, it will be ignored in future...
+        """
+        entry = (domain, query_type, result['host'])
+        if entry not in self.wildcards:
+            LOG.debug('Wildcard response for %s: %s %r', domain, query_type, result)
+            self._output_result('*.' + domain, query_type, result)
+            self.wildcards.append(entry)
+
     def _find_wildcards(self):
         """
         Queries some random non-existant records to reduce false positives.
         """
+        wildcard_N = self.options.wildcard_tests
+        if wildcard_N < 1:
+            return
         LOG.info("Eliminating wildcard responses from results")
         results = []
         for domain in self.domains:
-            names = [rand_name(), rand_name(), rand_name()]
+            names = [rand_name() for _ in range(0, wildcard_N)]
             for name in names:
                 for query_type in ['A', 'AAAA']:
                     dnsname = name + '.' + domain
@@ -166,14 +195,8 @@ class DNSBrute(object):
                         resp = self.query(dnsname, query_type).get()
                     except DNSError:
                         continue
-                    for result in self._format_results(query_type, resp):
-                        LOG.debug('Found wildcard response: %r', result)
-                        results.append((domain, result))
-        wildcards = []
-        for domain, (query_type, resp) in results:
-            wildcards.append((domain, query_type, resp['host']))
-            self._print_result('*.' + domain, query_type, resp)
-        self.wildcards = set(wildcards)
+                    for query_type, result in self._format_results(query_type, resp):
+                        self._add_wildcard(domain, query_type, result)
 
     def run(self):
         self._find_wildcards()
