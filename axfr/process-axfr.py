@@ -74,7 +74,7 @@ def load_file(csvfile):
 
 def flush_results(conn, inserts, updates):
     curs = conn.cursor()
-    curs.executemany('INSERT OR IGNORE INTO axfr_counts VALUES (?, ?, 0)', inserts)
+    curs.executemany('INSERT OR IGNORE INTO axfr_counts VALUES (?, ?, 0, 0)', inserts)
     curs.executemany('UPDATE axfr_counts SET cnt = cnt + ? WHERE nom = ? AND rec = ?', updates)
     conn.commit()
     return [], []
@@ -104,6 +104,7 @@ def create_table(conn):
         nom TEXT NOT NULL,
         rec TEXT NOT NULL,
         cnt INTEGER NOT NULL,
+        vfy INTEGER NOT NULL,
         PRIMARY KEY (nom, rec)
     ) WITHOUT ROWID
     """)
