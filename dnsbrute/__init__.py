@@ -34,9 +34,8 @@ class DNSNameTester(object):
         lookups = ['CNAME', 'A', 'AAAA']
         dnsname = self.domain
         if self.name is None:
-            lookups.append('MX')
-            lookups.append('SOA')
-            lookups.append('NS')
+            # Top-level, needs extra queries
+            lookups += ['MX', 'SOA', 'NS', 'SRV', 'TXT']
         else:
             dnsname = '.'.join([self.name, dnsname])
         for query_type in lookups:
