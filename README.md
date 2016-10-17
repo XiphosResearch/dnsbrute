@@ -48,7 +48,7 @@ optional arguments:
                         Wildcard elimination test queries, default: 3
   -R N, --retries N     Retries on failed DNS request, default: 2
   -C N, --concurrency N
-                        Concurrent DNS requests, default: 50
+                        Concurrent DNS requests, default: 20
   -T SECS, --timeout SECS
                         Timeout for DNS request in seconds, default: 1.5
 ```
@@ -75,3 +75,18 @@ optional arguments:
   -r RESOLVERS_FILE, --resolvers RESOLVERS_FILE
                         Load DNS resolver servers from file
 ```
+
+## Wordlist Generator
+
+Included with the dnsbrute source code are a collection of tools to extract 
+DNS names from Bind style zone files, these can be extracted from Dig results,
+from AXFR transfer, or by scraping them from Bind config directories.
+
+Three scripts are included:
+
+ * `axfr.sh` - Try to perform zone transfers on the Alexa top million
+ * `process-axfr.py` - Extract names and record types from zone files into SQLite DB
+ * `verify-axfr.py` - Verify which extracted names match zone files
+
+For your reference we provide a list of the top 20,000 DNS names as extracted 
+from all servers in the Alexa top million which allow anonymous zone transfers ;)

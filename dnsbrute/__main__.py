@@ -41,7 +41,7 @@ def main():
     parser.add_argument('-R', '--retries', default=2, type=int, metavar='N',
                         help="Retries on failed DNS request, default: 2")
     parser.add_argument('-C', '--concurrency', default=20, type=int,
-                        help="Concurrent DNS requests, default: 50", metavar='N')
+                        help="Concurrent DNS requests, default: 20", metavar='N')
     parser.add_argument('-T', '--timeout', default=1.5, type=float, metavar='SECS',
                         help="Timeout for DNS request in seconds, default: 1.5")
     parser.add_argument('domain', nargs='*', help='One or more domains')

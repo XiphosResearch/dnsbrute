@@ -1,6 +1,5 @@
 from __future__ import absolute_import, print_function
 from functools import partial
-from collections import namedtuple
 import os
 import base64
 import random
@@ -184,7 +183,6 @@ class DNSBrute(object):
         if wildcard_N < 1:
             return
         LOG.info("Eliminating wildcard responses from results")
-        results = []
         for domain in self.domains:
             names = [rand_name() for _ in range(0, wildcard_N)]
             for name in names:
@@ -229,7 +227,6 @@ class DNSError(Exception):
                                  pycares.errno.errorcode[errno])
         super(DNSError, self).__init__(msg)
         self.errno = errno
-
 
 
 class DNSResolver(object):
