@@ -8,11 +8,8 @@ keywords can be deleted, and which ones are useful.
 
 The following SQL query will provide the top 1000 most effective subdomains:
 
-    SELECT nom, GROUP_CONCAT(rec), SUM(vfy) AS total_cfy SUM(cnt) as total_cnt
-    FROM axfr_counts
-    GROUP BY nom
-    ORDER BY total_very
-    DESC LIMIT 1000;
+    SELECT nom, GROUP_CONCAT(rec), SUM(vfy) AS total_vfy, SUM(cnt) as total_cnt
+    FROM axfr_counts GROUP BY nom ORDER BY total_vfy DESC LIMIT 1000;
 """
 from __future__ import print_function
 import sys

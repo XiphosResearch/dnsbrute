@@ -6,6 +6,7 @@ import pkg_resources
 from . import DNSBrute
 
 
+
 def main():
     parser = argparse.ArgumentParser(description='DNS sub-domain brute forcer')
     parser.add_argument('-p', '--progress', action='store_true',

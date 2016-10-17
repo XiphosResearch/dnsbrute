@@ -12,8 +12,9 @@ was written because we knew there was a better way to do this.
  * JSON & text output
  * Progress bar
  * Tunable concurrency & timeout
+ * DNS resolver checker
 
-## Usage
+## DNSbrute Usage
 
 ```
 $ python -mdnsbrute
@@ -50,4 +51,27 @@ optional arguments:
                         Concurrent DNS requests, default: 50
   -T SECS, --timeout SECS
                         Timeout for DNS request in seconds, default: 1.5
+```
+
+### checkresolvers usage
+
+```
+$ python -mdnsbrute.checkresolvers
+usage: checkresolvers.py [-h] [-o OUTFILE] [-D] [-T SECS] [-q] [-v] [--debug]
+                         [-r RESOLVERS_FILE]
+
+DNS resolver list checker
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTFILE, --output OUTFILE
+                        Output results to file
+  -D, --download        Download new list of resolvers from public-dns.info
+  -T SECS, --timeout SECS
+                        Timeout for DNS request in seconds, default: 0.5
+  -q, --quiet           Don't print results to console
+  -v, --verbose         Log informational messages
+  --debug               Log debugging messages
+  -r RESOLVERS_FILE, --resolvers RESOLVERS_FILE
+                        Load DNS resolver servers from file
 ```

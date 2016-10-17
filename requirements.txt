@@ -1,3 +1,5 @@
 gevent
 pycares
+dnspython
+requests
 git+https://github.com/WoLpH/python-progressbar.git@develop
