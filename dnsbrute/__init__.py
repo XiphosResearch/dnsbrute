@@ -43,6 +43,7 @@ class DNSNameTester(object):
                 self.bruter.on_result(self.domain, self.name, query_type, resp, None)
             except DNSError as ex:
                 self.bruter.on_result(self.domain, self.name, query_type, None, ex)
+        self.bruter.on_finish(self.domain)
 
 
 class DNSTesterGenerator(object):
@@ -75,6 +76,7 @@ class DNSBrute(object):
             self.progress = progressbar.ProgressBar(
                 redirect_stdout=True,
                 widgets=[
+                    progressbar.Percentage(),
                     progressbar.Bar(),
                     ' (', progressbar.ETA(), ') ',
                 ])
@@ -120,6 +122,7 @@ class DNSBrute(object):
             if name and  name[0] == '*':
                 outdict['_wildcard'] = True
             outjson.write(json.dumps(outdict) + "\n")
+            outjson.flush()
 
     def _structseq_to_dict(self, obj):
         """
@@ -150,6 +153,14 @@ class DNSBrute(object):
             for resp in resp_list
         ]
 
+    def on_finish(self, domain):
+        if self.progress:
+            try:
+                self.progress.update(self.finished)
+            except Exception:
+                self.progress.update(progressbar.UnknownLength)
+        self.finished += 1
+
     def on_result(self, domain, dnsname, query_type, resp, error=None):
         """
         When a DNS name tester finds a result, it triggers this
@@ -159,12 +170,6 @@ class DNSBrute(object):
             for _, result in results:
                 if not self._is_wildcard(domain, query_type, result):
                     self._output_result(domain, dnsname, query_type, result)
-        if self.progress:
-            try:
-                self.progress.update(self.finished)
-            except Exception:
-                self.progress.update(progressbar.UnknownLength)
-        self.finished += 1
 
     def query(self, name, query_type):
         return DNSResolver.query(name, query_type, timeout=self.options.timeout,
@@ -319,10 +324,10 @@ class DNSResolver(object):
                     continue
                 rlist, wlist, _ = select.select(
                     read_fds, write_fds, [], timeout)
-                for fd in rlist:
-                    cls._channel.process_fd(fd, pycares.ARES_SOCKET_BAD)
-                for fd in wlist:
-                    cls._channel.process_fd(pycares.ARES_SOCKET_BAD, fd)
+                for handle in rlist:
+                    cls._channel.process_fd(handle, pycares.ARES_SOCKET_BAD)
+                for handle in wlist:
+                    cls._channel.process_fd(pycares.ARES_SOCKET_BAD, handle)
         except Exception:
             LOG.exception(__name__)
             cls._channel.cancel()

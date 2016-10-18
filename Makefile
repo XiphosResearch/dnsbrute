@@ -14,3 +14,6 @@ test:
 lint:
 	$(PYTHON) -mpyflakes dnsbrute
 	$(PYTHON) -mpylint -d missing-docstring dnsbrute
+
+clean:
+	find ./ -name '*.pyc' -exec rm -f '{}' ';'
