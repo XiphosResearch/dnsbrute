@@ -154,7 +154,10 @@ class DNSBrute(object):
                 if not self._is_wildcard(domain, query_type, result):
                     self._output_result(dnsname, query_type, result)
         if self.progress:
-            self.progress.update(self.finished)
+            try:
+                self.progress.update(self.finished)
+            except Exception:
+                self.progress.update(progressbar.UnknownLength)
         self.finished += 1
 
     def query(self, name, query_type):
