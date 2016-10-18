@@ -49,7 +49,7 @@ def main():
     parser.add_argument('domain', nargs='*', help='One or more domains')
     args = parser.parse_args()
     logging.basicConfig(level=args.loglevel)
-    args.extra = dict([X.split('=', 1) for X in args.extra])
+    args.extra = dict([X.split('=', 1) for X in args.extra or []])
     bruter = DNSBrute(args)
     if not bruter.valid():
         parser.print_help()
