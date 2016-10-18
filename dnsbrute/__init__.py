@@ -40,9 +40,9 @@ class DNSNameTester(object):
         for query_type in lookups:
             try:
                 resp = self.bruter.query(dnsname, query_type).get()
-                self.bruter.on_result(self.domain, dnsname, query_type, resp, None)
+                self.bruter.on_result(self.domain, self.name, query_type, resp, None)
             except DNSError as ex:
-                self.bruter.on_result(self.domain, dnsname, query_type, None, ex)
+                self.bruter.on_result(self.domain, self.name, query_type, None, ex)
 
 
 class DNSTesterGenerator(object):
@@ -87,10 +87,14 @@ class DNSBrute(object):
     def valid(self):
         return len(self.domains) and len(self.resolvers) and len(self.names)
 
-    def _output_result(self, dnsname, query_type, result):
+    def _output_result(self, domain, name, query_type, result):
         """
         Output results, in various formats, to necessary places
         """
+        if name is None:
+            dnsname = domain
+        else:
+            dnsname = '.'.join([name, domain])
         res_keys = ' '.join(['='.join([key, str(value)])
                              for key, value in result.items()])
         info = ' '.join([dnsname, query_type, res_keys])
@@ -110,8 +114,10 @@ class DNSBrute(object):
         if outjson:
             outdict = result.copy()
             outdict['_type'] = query_type
-            outdict['_name'] = dnsname
-            if dnsname[0] == '*':
+            outdict['_domain'] = domain
+            outdict['_name'] = name
+            outdict.update(self.options.extra)
+            if name and  name[0] == '*':
                 outdict['_wildcard'] = True
             outjson.write(json.dumps(outdict) + "\n")
 
@@ -152,7 +158,7 @@ class DNSBrute(object):
             results = self._format_results(query_type, resp)
             for _, result in results:
                 if not self._is_wildcard(domain, query_type, result):
-                    self._output_result(dnsname, query_type, result)
+                    self._output_result(domain, dnsname, query_type, result)
         if self.progress:
             try:
                 self.progress.update(self.finished)
@@ -165,17 +171,22 @@ class DNSBrute(object):
                                  tries=self.options.retries, servers=self.resolvers)
 
     def _is_wildcard(self, domain, query_type, result):
-        if query_type in ['A', 'AAAA']:
+        if query_type in ['CNAME']:
+            return (domain, query_type, result['cname']) in self.wildcards
+        elif query_type in ['A', 'AAAA']:
             return (domain, query_type, result['host']) in self.wildcards
 
     def _add_wildcard(self, domain, query_type, result):
         """
         Remember the result as a wildcard, it will be ignored in future...
         """
-        entry = (domain, query_type, result['host'])
+        if query_type == 'CNAME':
+            entry = (domain, query_type, result['cname'])
+        else:
+            entry = (domain, query_type, result['host'])
         if entry not in self.wildcards:
             LOG.debug('Wildcard response for %s: %s %r', domain, query_type, result)
-            self._output_result('*.' + domain, query_type, result)
+            self._output_result(domain, '*', query_type, result)
             self.wildcards.append(entry)
 
     def _find_wildcards(self):
@@ -189,7 +200,7 @@ class DNSBrute(object):
         for domain in self.domains:
             names = [rand_name() for _ in range(0, wildcard_N)]
             for name in names:
-                for query_type in ['A', 'AAAA']:
+                for query_type in ['A', 'AAAA', 'CNAME']:
                     dnsname = name + '.' + domain
                     try:
                         resp = self.query(dnsname, query_type).get()

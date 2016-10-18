@@ -36,6 +36,8 @@ def main():
     parser.add_argument('-d', '--domains', metavar='DOMAINS_FILE',
                         type=argparse.FileType('r'),
                         help="Load target domains from file")
+    parser.add_argument('-x', '--extra', metavar='K=V', action='append',
+                        help="Extra variables for JSON output")
     parser.add_argument('-W', '--wildcard-tests', default=3, type=int, metavar='N',
                         help="Wildcard elimination test queries, default: 3")
     parser.add_argument('-R', '--retries', default=2, type=int, metavar='N',
@@ -47,6 +49,7 @@ def main():
     parser.add_argument('domain', nargs='*', help='One or more domains')
     args = parser.parse_args()
     logging.basicConfig(level=args.loglevel)
+    args.extra = dict([X.split('=', 1) for X in args.extra])
     bruter = DNSBrute(args)
     if not bruter.valid():
         parser.print_help()
