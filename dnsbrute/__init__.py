@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 
 def rand_name():
-    return base64.b32encode(os.urandom(50))[:random.randint(5, 30)].lower()
+    return base64.b32encode(os.urandom(50))[:random.randint(10, 30)].lower()
 
 
 class DNSNameTester(object):
@@ -75,6 +75,7 @@ class DNSBrute(object):
         if options.progress:
             self.progress = progressbar.ProgressBar(
                 redirect_stdout=True,
+                redirect_stderr=True,
                 widgets=[
                     progressbar.Percentage(),
                     progressbar.Bar(),
@@ -194,36 +195,57 @@ class DNSBrute(object):
             self._output_result(domain, '*', query_type, result)
             self.wildcards.append(entry)
 
+    def _test_wildcard(self, domain, name):
+        for query_type in ['A', 'AAAA', 'CNAME']:
+            dnsname = name + '.' + domain
+            try:
+                resp = self.query(dnsname, query_type).get()
+            except DNSError:
+                continue
+            for query_type, result in self._format_results(query_type, resp):
+                self._add_wildcard(domain, query_type, result)
+        self.on_finish(domain)
+
     def _find_wildcards(self):
         """
         Queries some random non-existant records to reduce false positives.
+        Returns True if process can continue, otherwise false.
         """
         wildcard_N = self.options.wildcard_tests
         if wildcard_N < 1:
-            return
+            return True
         LOG.info("Eliminating wildcard responses from results")
-        for domain in self.domains:
-            names = [rand_name() for _ in range(0, wildcard_N)]
-            for name in names:
-                for query_type in ['A', 'AAAA', 'CNAME']:
-                    dnsname = name + '.' + domain
-                    try:
-                        resp = self.query(dnsname, query_type).get()
-                    except DNSError:
-                        continue
-                    for query_type, result in self._format_results(query_type, resp):
-                        self._add_wildcard(domain, query_type, result)
+        isok = True
+        # Setup pool and progress
+        pool = gevent.pool.Pool(self.options.concurrency)
+        iterator = self.domains
+        if self.progress:
+            iterator = self.progress
+            iterator.start(len(self.domains) * wildcard_N)
+        self.finished = 0
+        try:
+            for domain in self.domains:
+                names = [rand_name() for _ in range(0, wildcard_N)]
+                for name in names:
+                    pool.add(gevent.spawn(self._test_wildcard, domain, name))
+        except KeyboardInterrupt:
+            print("Ctrl+C caught... stopping")
+            isok = False
+        pool.join()
+        return isok
+
 
     def run(self):
-        self._find_wildcards()
+        if not self._find_wildcards():
+            return
         pool = gevent.pool.Pool(self.options.concurrency)
         namegen = DNSTesterGenerator(self, self.domains, self.names)
-        if self.progress:
-            self.progress.start()
+        self.finished = 0
         try:
             iterator = namegen.all()
             if self.progress:
                 iterator = self.progress(iterator, namegen.total)
+                iterator.start()
             for tester in iterator:
                 pool.add(gevent.spawn(tester.run))
         except KeyboardInterrupt:
