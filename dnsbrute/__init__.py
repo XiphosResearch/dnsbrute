@@ -214,14 +214,13 @@ class DNSBrute(object):
         wildcard_N = self.options.wildcard_tests
         if wildcard_N < 1:
             return True
-        LOG.info("Eliminating wildcard responses from results")
+        total_queries = len(self.domains) * wildcard_N
+        LOG.info("Eliminating wildcard responses (%d tests)", total_queries)
         isok = True
         # Setup pool and progress
         pool = gevent.pool.Pool(self.options.concurrency)
-        iterator = self.domains
         if self.progress:
-            iterator = self.progress
-            iterator.start(len(self.domains) * wildcard_N)
+            self.progress.start(total_queries)
         self.finished = 0
         try:
             for domain in self.domains:
@@ -240,13 +239,12 @@ class DNSBrute(object):
             return
         pool = gevent.pool.Pool(self.options.concurrency)
         namegen = DNSTesterGenerator(self, self.domains, self.names)
+        LOG.info("Starting DNS brute force (%d tests)", namegen.total)
         self.finished = 0
         try:
-            iterator = namegen.all()
             if self.progress:
-                iterator = self.progress(iterator, namegen.total)
-                iterator.start()
-            for tester in iterator:
+                self.progress.start(namegen.total)
+            for tester in namegen.all():
                 pool.add(gevent.spawn(tester.run))
         except KeyboardInterrupt:
             print("Ctrl+C caught... stopping")
