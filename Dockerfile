@@ -4,4 +4,4 @@ COPY . /root/dnsbrute-py/
 
 WORKDIR /root/dnsbrute-py
 
-CMD ["/usr/bin/python", "-mdnsbrute"]
+ENTRYPOINT ["/usr/bin/python", "-mdnsbrute"]
