@@ -74,7 +74,7 @@ def load_resolvers(handle):
 
 
 def check_resolver(args, resolver):
-    server, (avgtime, isgood), results = time_resolve(args, resolver, "example.com", "A")
+    server, (avgtime, isgood), _ = time_resolve(args, resolver, "example.com", "A")
     if args.output and isgood:
         args.output.write(server + "\n")
         args.output.flush()

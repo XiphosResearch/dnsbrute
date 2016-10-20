@@ -1,5 +1,4 @@
 gevent
-pycares
 dnspython
 requests
 progressbar2

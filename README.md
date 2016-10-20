@@ -1,18 +1,26 @@
 # DNSbrute
 
-DNS sub-domain brute forcer, written in Python, with a progres bar!
+Fast and lightweight DNS sub-domain brute forcer, with a progres bar!
 
-Unlike the other Python based DNS sub-domain brute forcers, this doesn't use 
-multiprocessing (like subbrute, which is slow and leaves processes behind). It 
-was written because we knew there was a better way to do this.
+A viable alternative or companion to [subbrute](https://github.com/TheRook/subbrute), [dnscan](https://github.com/rbsec/dnscan), [massdns](https://github.com/blechschmidt/massdns), [subsearch](https://github.com/gavia/subsearch), [dnsrecon](https://github.com/darkoperator/dnsrecon), [knock](https://github.com/guelfoweb/knock), [dns_extractor](https://github.com/eliasgranderubio/dns_extractor), [Bluto](https://github.com/darryllane/Bluto), [snoopbrute](https://github.com/m57/snoopbrute), [gobuster](https://github.com/OJ/gobuster), [fierce](https://github.com/davidpepper/fierce-domain-scanner), [dnsmap](https://github.com/makefu/dnsmap), [dnsenum](https://github.com/fwaeytens/dnsenum) and [DNS-Discovery](https://github.com/m0nad/DNS-Discovery). It seems everybody and their dog has made a DNS subdomain discovery tool!
+
+But, why is this one different? What else does it do?
 
 ## Features
 
+ * Progress bar... awesomeness!
  * Wildcard elimination
  * JSON & text output
- * Progress bar
- * Tunable concurrency & timeout
  * DNS resolver checker
+ * Tunable retries & timeout
+ * Free & liberal open-source
+
+## TODO
+
+ * DNS zone transfer
+ * Randomized order & delay
+ * Reverse DNS / PTR lookup
+ * Queued processing (ZeroMQ, Beanstalkd etc)
 
 ## DNSbrute Usage
 
